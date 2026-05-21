@@ -28,4 +28,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_HUB_TOKEN_2026_HW1 }}/lecture-hw1:latest
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/mlops_hw1_26_fraud_detector_lecture:latest
