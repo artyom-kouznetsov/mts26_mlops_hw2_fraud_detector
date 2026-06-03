@@ -2,20 +2,25 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Создание директории для логов
-RUN mkdir -p /app/logs && \
-    touch /app/logs/service.log && \
-    chmod -R 777 /app/logs  # Права на запись для всех пользователей
+# install system dependencies needed by LightGBM
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
 
-# Установка зависимостей
+# create runtime directories
+RUN mkdir -p /app/logs /app/input /app/output /app/models && \
+    touch /app/logs/service.log && \
+    chmod -R 777 /app/logs /app/input /app/output
+
+# install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копирование исходного кода
+# copy source code and model artifact
 COPY . .
 
-# Точки монтирования
+# mount points for input and output data
 VOLUME /app/input
 VOLUME /app/output
 
-CMD ["python", "./app/app.py"]
+CMD ["python", "-u", "./app/app.py"]

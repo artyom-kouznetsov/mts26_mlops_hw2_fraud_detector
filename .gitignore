@@ -1,3 +1,40 @@
-.venv
-*.DS_Store
-*.csv
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# virtual environments
+.venv/
+venv/
+env/
+
+# jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# local data
+input/
+output/
+logs/
+train_data/
+test_data/
+submission/
+artifacts/
+
+# MLflow
+mlflow_tmp/
+mlruns/
+
+# IDE
+.vscode/
+
+# Local config / cache
+*.log
+*.tmp
+.DS_Store
+
+# notebook-only dependencies
+requirements_notebook.txt
+
+# docker compose is not needed for final service run
+docker-compose.yml
