@@ -113,7 +113,7 @@ use port `5432` inside the Compose network.
 6. Open [Grafana](http://localhost:3000). The default credentials are
    `admin` / `admin`. Open **Fraud detector / Realtime fraud scoring** to view:
 
-   - score distribution density;
+   - score distribution;
    - processing throughput (transactions per second);
    - average fraud share by `cat_id` over the latest 1000 transactions;
    - multi-select state and merchant filters.
