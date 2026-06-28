@@ -8,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 def drop_unused_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Remove personal and metadata columns that are 
-    not used for modelling.
+    Remove personal and metadata columns that are not used for modelling.
     """
     df = df.copy()
 
@@ -23,8 +22,7 @@ def drop_unused_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def clean_categorical_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Clean categorical variables and ensure that postal codes 
-    have a string type.
+    Clean cat variables and convert postal codes to strings.
     """
     df = df.copy()
 
@@ -46,7 +44,7 @@ def add_time_features(
     drop_transaction_time: bool = True,
 ) -> pd.DataFrame:
     """
-    Extract time-based features from transaction timestamp.
+    Extract time-based features from the transaction timestamp.
     """
     df = df.copy()
 
@@ -93,8 +91,7 @@ def add_time_features(
 
 def add_distance_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Create geographic distance features between customer 
-    and merchant.
+    Create geographic distance features between customer and merchant.
     """
     df = df.copy()
 
@@ -186,8 +183,7 @@ def add_amount_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Create categorical interaction features from transaction 
-    context.
+    Create cat interaction features from the transaction context.
     """
     df = df.copy()
 
@@ -224,8 +220,7 @@ def add_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def prepare_features(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Apply the full feature-engineering pipeline to
-    extract/create features
+    Apply the full feature-engineering pipeline.
     """
     df = df.copy()
 

@@ -6,3 +6,6 @@ category-encoders==2.6.4
 joblib==1.4.2
 watchdog==5.0.3
 matplotlib==3.9.2
+confluent-kafka==2.8.0
+psycopg[binary]==3.2.5
+streamlit==1.42.2

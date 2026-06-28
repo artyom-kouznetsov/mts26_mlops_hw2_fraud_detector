@@ -1,144 +1,186 @@
-# ML fraud detection service
+# Realtime fraud detector
 
-Project for MTS/Teta ML 2026 MLOps course.
+This educational MLOps project implements streaming fraud scoring. A user
+uploads `test.csv` through Streamlit, each row travels through Kafka and a
+pretrained LightGBM model, and the result is published to a second Kafka topic
+and stored in PostgreSQL. Streamlit displays recent results, while a provisioned
+Grafana dashboard visualizes model and processing metrics.
 
-Dataset source:
-https://www.kaggle.com/competitions/teta-ml-1-2025
+The containers perform inference only. No model training or GPU is required.
 
-This service performs automatic fraud detection for transaction data in batch scoring mode. It processes `.csv` files from the mounted input directory using a pretrained LightGBM pipeline.
+The project extends the first homework service and reuses its model and feature
+engineering. 
 
-The service performs inference only. Model training is not performed inside the container.
+## Architecture
 
-## Solution architecture
-
-```
-├── .dockerignore
-├── .gitignore
-├── Dockerfile
-├── README.md
-├── requirements.txt
-│
-├── app/
-│   └── app.py                      # service core and file watcher
-│
-├── src/
-│   ├── preprocessing.py            # data preprocessing pipeline
-│   ├── scorer.py                   # model loading, prediction, feature importance
-│   └── exporter.py                 # submission, json and plot export
-│
-├── models/
-│   └── fraud_lgbm_pipeline.joblib  # serialized LightGBM sklearn pipeline
-│
-├── input/                          # directory for input csv files
-├── output/                         # directory for scoring results
-└── logs/                           # service logs, if mounted
-```
-
-## Key features
-
-### Logging
-
-- Console logging during container runtime
-- File logging to `/app/logs/service.log`
-- Current logging level: `INFO`
-
-To save logs locally, mount `./logs` to `/app/logs`:
-
-```bash
--v "$(pwd)/logs:/app/logs"
+```text
+                         ┌──────────────┐
+test.csv ─► Streamlit ─► │ transactions │
+                         │    Kafka     │
+                         └──────┬───────┘
+                                ▼
+                  preprocessing + LightGBM
+                                │
+                         ┌──────▼───────┐
+                         │    scores    │
+                         │    Kafka     │
+                         └──────┬───────┘
+                                ▼
+                     PostgreSQL writer
+                                │
+                   ┌────────────┴────────────┐
+                   ▼                         ▼
+            Streamlit results        Grafana dashboard
 ```
 
-### Data preprocessing pipeline (`preprocessing.py`)
+| Container | Purpose |
+|---|---|
+| `kafka` | Kafka 3.9 in KRaft mode without ZooKeeper |
+| `kafka-init` | Creates the `transactions` and `scores` topics |
+| `scorer` | Reads transactions, preprocesses them, and runs inference |
+| `postgres-writer` | Reads `scores` and upserts results into PostgreSQL |
+| `postgres` | Stores the `transaction_scores` data mart and indexes |
+| `interface` | Uploads CSV files and displays results in Streamlit |
+| `kafka-ui` | Displays Kafka topics and messages |
+| `grafana` | Displays the provisioned PostgreSQL dashboard |
 
-1. **Unused columns removal**
-   - Drops personal / high-cardinality raw columns not used by the model:
-     - `name_1`
-     - `name_2`
-     - `street`
+## Message contracts
 
-2. **Categorical cleaning**
-   - Cleans merchant names
-   - Converts `post_code` to string type
+The `transactions` topic receives one JSON record per CSV row. If the source
+file has neither `transaction_id` nor `id`, the UI generates a UUID.
 
-3. **Time features**
-   - Extracts hour, year, month, day of month, and day of week
-   - Creates night/weekend indicators
-   - Creates cyclic features for hour and month
-   - Removes the original `transaction_time`
+The JSON value in `scores` contains exactly three required fields:
 
-4. **Geospatial features**
-   - Calculates customer–merchant distance
-   - Creates latitude and longitude difference features
-   - Creates distance transformations and buckets
+```json
+{
+  "transaction_id": "de67cdda-5c65-4c42-881c-e02f20d09272",
+  "score": 0.912341,
+  "fraud_flag": 1
+}
+```
 
-5. **Numerical transformations**
-   - Log-transformations for amount, population, and distance
-   - Amount-to-distance and amount-to-population ratios
+The `us_state`, `merch`, and `cat_id` fields, along with the `processed_at`
+timestamp, are passed in Kafka headers. The writer stores them in PostgreSQL for
+Grafana filters and throughput calculations.
 
-6. **Interaction features**
-   - Category-hour interaction
-   - Category-period interaction
-   - Category-weekend interaction
-   - State-category interaction
-
-### Model layer (`scorer.py`)
-
-- Automatic model loading during service initialization
-- Batch scoring through `predict_proba`
-- Classification threshold is loaded from the saved model artifact (~0.875)
-- Top-5 feature importances are exported to `.json`
-
-### Export layer (`exporter.py`)
-
-- Exports prediction file in sample submission format
-- Exports top-5 feature importances as `.json`
-- Exports predicted score distribution plot as `.png`
+The scorer processes microbatches of 256 messages, and the writer persists
+batches of up to 500 rows. Batch sizes and timeouts can be changed in `.env`
+through `SCORER_BATCH_SIZE`, `SCORER_BATCH_TIMEOUT_SECONDS`,
+`WRITER_BATCH_SIZE`, and `WRITER_BATCH_TIMEOUT_SECONDS`.
 
 ## Quick start
 
-### Requirements
+Requirements:
 
-- Docker 20.10+
-- 2 GB free disk space
-- No GPU required
-- Ports: filesystem only
+- Docker Engine;
+- Docker Compose v2;
+- at least 4 GB of free RAM.
 
-### Run the service
+Host ports are configured in `.env`. The default PostgreSQL host port is
+`55432` to avoid conflicts with locally installed PostgreSQL. Containers still
+use port `5432` inside the Compose network.
 
-1. Build Docker image:
+1. Create the local configuration file:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Build and start the complete stack:
+
+   ```bash
+   docker compose up --build -d
+   ```
+
+3. Check container status:
+
+   ```bash
+   docker compose ps -a
+   ```
+
+   The one-time `kafka-init` service should report `Exited (0)`. The remaining
+   services should be `Up` or `healthy`.
+
+4. Open [Streamlit](http://localhost:8501), upload a competition-format
+   `test.csv`, and select **Send to Kafka**. For a quick local check, use
+   `input/test.csv` if it exists in the working copy.
+
+5. Open the **Results** tab and select **View results**. The interface displays:
+
+   - up to 10 latest transactions with `fraud_flag = 1`;
+   - a histogram of scores from the latest 100 transactions.
+
+6. Open [Grafana](http://localhost:3000). The default credentials are
+   `admin` / `admin`. Open **Fraud detector / Realtime fraud scoring** to view:
+
+   - score distribution density;
+   - processing throughput (transactions per second);
+   - average fraud share by `cat_id` over the latest 1000 transactions;
+   - multi-select state and merchant filters.
+
+Kafka messages are available in [Kafka UI](http://localhost:8080) under the
+`local` cluster and the `transactions` or `scores` topic.
+
+## Command line verification
+
+Count persisted results:
 
 ```bash
-docker build -t fraud-detector-service .
+docker compose exec postgres psql -U fraud -d fraud -c \
+  "SELECT COUNT(*) FROM transaction_scores;"
 ```
 
-2. Run the container with mounted volumes:
+Follow streaming-service logs:
 
 ```bash
-docker run --rm \
-  -v "$(pwd)/input:/app/input" \
-  -v "$(pwd)/output:/app/output" \
-  fraud-detector-service
+docker compose logs -f scorer postgres-writer interface
 ```
 
-3. After the message `File observer started`, add a competition-format `.csv` file to `./input`.
+## PostgreSQL data mart
 
+The `transaction_scores` table is created automatically from `db/init.sql`.
 
-4. Wait for preprocessing and scoring to finish. The generated files will be saved to `./output`.
+| Field | Type | Purpose |
+|---|---|---|
+| `transaction_id` | `TEXT UNIQUE` | Transaction identifier |
+| `score` | `DOUBLE PRECISION` | Fraud probability from 0 to 1 |
+| `fraud_flag` | `SMALLINT` | Model decision: 0 or 1 |
+| `us_state` | `TEXT` | State field for Grafana |
+| `merch` | `TEXT` | Merchant field for Grafana |
+| `cat_id` | `TEXT` | Product category |
+| `processed_at` | `TIMESTAMPTZ` | Inference completion time |
 
-5. Stop the service after scoring (`Ctrl + C`).
+The writer uses `ON CONFLICT (transaction_id) DO UPDATE`, so replaying a Kafka
+message does not create a duplicate row.
 
-## Output
+## Repository structure
 
-For `input/test.csv`, the service creates:
+```text
+├── app/
+│   ├── app.py                    # legacy batch service from part one
+│   └── streamlit_app.py          # kafka producer and results ui
+├── db/init.sql                   # postgresql data-mart initialization
+├── grafana/
+│   ├── dashboards/              # dashboard json
+│   └── provisioning/            # datasource and dashboard provider
+├── models/fraud_lgbm_pipeline.joblib
+├── src/
+│   ├── kafka_scorer.py           # transactions to scores
+│   ├── postgres_writer.py        # scores to postgresql
+│   ├── preprocessing.py          # feature engineering
+│   └── scorer.py                 # model loading and predict_proba
+├── .env.example
+├── Dockerfile
+├── docker-compose.yml
+└── requirements.txt
+```
 
-    output/sample_submission_test.csv
-    output/feature_importances_top5_test.json
-    output/score_distribution_test.png
+## Stop
 
+Stop the project:
 
-## Notes
+```bash
+docker compose down
+```
 
-- The input file must have the same format as `test.csv` from the competition.
-- Any `.csv` filename can be used in the `input/` directory.
-- `train.csv` is not required inside the container.
-- The model artifact must already exist at `models/fraud_lgbm_pipeline.joblib`.
+Use `docker compose down -v` to also remove all stored data.

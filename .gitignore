@@ -36,5 +36,5 @@ mlruns/
 # notebook-only dependencies
 requirements_notebook.txt
 
-# docker compose is not needed for final service run
-docker-compose.yml
+# local secrets (the documented template remains in git)
+.env

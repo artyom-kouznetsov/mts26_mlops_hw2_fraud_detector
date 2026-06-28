@@ -1,9 +1,9 @@
 import logging
+from pathlib import Path
+
 import joblib
 import numpy as np
 import pandas as pd
-
-from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def load_model_artifact(model_path: Path) -> dict:
     """
-    Load trained model artifact.
+    Load the trained model artifact.
     """
     logger.info("Loading model artifact: %s", model_path)
 
@@ -30,7 +30,7 @@ def make_pred(
     model_artifact: dict,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Score processed data with trained model artifact.
+    Score processed data with the trained model artifact.
     """
     model = model_artifact["model"]
     threshold = model_artifact["threshold"]
@@ -64,7 +64,7 @@ def get_top_feature_importances(
     top_n: int = 5,
 ) -> dict:
     """
-    Extract top feature importances from fitted LightGBM classifier.
+    Extract top feature importances from the fitted lightgbm classifier.
     """
     model = model_artifact["model"]
     selected_features = model_artifact["selected_features"]

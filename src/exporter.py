@@ -1,9 +1,9 @@
 import json
 import logging
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import pandas as pd
-
-from pathlib import Path
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ def save_feature_importances(
     output_path: Path,
 ) -> None:
     """
-    Save top feature importances to JSON.
+    Save top feature importances to json.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -61,7 +61,7 @@ def save_score_distribution(
     output_path: Path,
 ) -> None:
     """
-    Save predicted score distribution plot.
+    Save the predicted score distribution plot.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
 

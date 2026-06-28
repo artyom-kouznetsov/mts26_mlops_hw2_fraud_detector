@@ -1,16 +1,17 @@
 import logging
 import sys
 import time
-import pandas as pd
-
 from pathlib import Path
+
+import pandas as pd
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
-
+# project & src root directories
 BASE_DIR = Path(__file__).resolve().parents[1]
 SRC_DIR = BASE_DIR / "src"
 
+# allow the legacy entry point to import project modules when run directly
 sys.path.insert(0, str(SRC_DIR))
 
 from exporter import (
@@ -25,7 +26,8 @@ from scorer import (
     make_pred,
 )
 
-
+# --- main app ---
+# send logs to both the mounted file and docker output
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -46,6 +48,7 @@ class ProcessingService:
         self.output_dir = Path("/app/output")
         self.model_path = Path("/app/models/fraud_lgbm_pipeline.joblib")
 
+        # load the model once and reuse it for every discovered csv file
         self.model_artifact = load_model_artifact(self.model_path)
 
         logger.info("Service initialized")
@@ -66,6 +69,7 @@ class ProcessingService:
                 self.model_artifact,
             )
 
+            # tie every generated artifact to its source filename
             input_name = file_path.stem
 
             submission_path = (
@@ -120,6 +124,7 @@ class FileHandler(FileSystemEventHandler):
 
         if event.src_path.endswith(".csv"):
             logger.info("New .csv file detected: %s", event.src_path)
+            # allow the external file copy to finish before reading it
             time.sleep(1)
             self.service.process_single_file(event.src_path)
 
@@ -129,6 +134,7 @@ if __name__ == "__main__":
 
     service = ProcessingService()
 
+    # process files that existed before the filesystem observer started
     existing_csv_files = sorted(service.input_dir.glob("*.csv"))
 
     if existing_csv_files:
@@ -140,6 +146,7 @@ if __name__ == "__main__":
         for csv_file in existing_csv_files:
             service.process_single_file(csv_file)
 
+    # keep watching the input directory for newly created csv files
     observer = Observer()
     observer.schedule(
         FileHandler(service),
